@@ -1029,9 +1029,21 @@ async def backup_database():
             get_db_pool().putconn(conn)
         
         chromadb_path = 'chroma.sqlite3'
-        if os.path.exists(chromadb_path):
+        chromadb_folder = 'chroma_data'
+        
+        # Check for folder first (preferred), fallback to single file
+        if os.path.isdir(chromadb_folder):
+            for root, dirs, files in os.walk(chromadb_folder):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = file_path  # Keep relative path in zip
+                    zf.write(file_path, arcname)
+            manifest["includes_chromadb"] = True
+            manifest["chroma_backup_type"] = "folder"
+        elif os.path.exists(chromadb_path):
             zf.write(chromadb_path, 'chroma.sqlite3')
             manifest["includes_chromadb"] = True
+            manifest["chroma_backup_type"] = "file"
         
         zf.writestr('manifest.json', json.dumps(manifest, indent=2))
     
@@ -1223,10 +1235,98 @@ async def restore_database(file: UploadFile = File(...)):
                         conn.commit()
                         print(f"Successfully inserted {inserted_count} rows into {table_name}", flush=True)
                         
-                        if manifest.get('includes_chromadb') and 'chroma.sqlite3' in zf.namelist():
+                        # Handle ChromaDB restore
+                        chroma_files = [n for n in zf.namelist() if n.startswith('chroma_data/')]
+                        if manifest.get('includes_chromadb') and chroma_files:
                             print("Starting ChromaDB/Vanna vector store restoration...", flush=True)
+                            
+                            # Clear existing chroma_data directory
+                            target_dir = '/app/chroma_data'
+                            if os.path.exists(target_dir):
+                                import shutil
+                                shutil.rmtree(target_dir)
+                            os.makedirs(target_dir, exist_ok=True)
+                            
+                            # Extract chroma_data folder contents
+                            for chroma_file in chroma_files:
+                                # Get relative path inside chroma_data folder
+                                relative_path = chroma_file.replace('chroma_data/', '', 1)
+                                if not relative_path:
+                                    continue
+                                target_path = os.path.join(target_dir, relative_path)
+                                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                                content = zf.read(chroma_file)
+                                with open(target_path, 'wb') as f:
+                                    f.write(content)
+                            
+                            print("ChromaDB data restored. Re-instantiating client...", flush=True)
+                            
+                            # Re-instantiate Vanna client to pick up new data
+                            global vn
+                            if OPENAI_API_KEY and OPENAI_API_KEY != "your_openai_key_here":
+                                try:
+                                    # Clean up existing connections if any
+                                    vn = None
+                                    
+                                    from vanna.chromadb import ChromaDB_VectorStore
+                                    from vanna.openai import OpenAI_Chat
+                                    
+                                    class VannaAI(ChromaDB_VectorStore, OpenAI_Chat):
+                                        def __init__(self, config=None):
+                                            ChromaDB_VectorStore.__init__(self, config=config)
+                                            OpenAI_Chat.__init__(self, config=config)
+                                    
+                                    vn = VannaAI(config={
+                                        "api_key": OPENAI_API_KEY,
+                                        "model": "gpt-4o",
+                                        "chroma_persist_directory": "./chroma_data"
+                                    })
+                                    
+                                    # Add DDLs again to re-initialize
+                                    vn.add_ddl("""
+                                    CREATE TABLE sites (
+                                        site_id VARCHAR(255) PRIMARY KEY,
+                                        name VARCHAR(255),
+                                        description TEXT,
+                                        created_at TIMESTAMPTZ DEFAULT NOW()
+                                    )
+                                    """)
+                                    
+                                    vn.add_ddl("""
+                                    CREATE TABLE meters (
+                                        meter_id VARCHAR(255) PRIMARY KEY,
+                                        site_id VARCHAR(255) REFERENCES sites(site_id),
+                                        name VARCHAR(255),
+                                        description TEXT,
+                                        created_at TIMESTAMPTZ DEFAULT NOW()
+                                    )
+                                    """)
+                                    
+                                    vn.add_ddl("""
+                                    CREATE TABLE energy_readings (
+                                        timestamp TIMESTAMPTZ NOT NULL,
+                                        site_id VARCHAR(255) NOT NULL,
+                                        meter_id VARCHAR(255) NOT NULL,
+                                        export_energy NUMERIC,
+                                        export_power NUMERIC,
+                                        import_energy NUMERIC,
+                                        import_power NUMERIC,
+                                        day_of_week VARCHAR(10),
+                                        workday BOOLEAN DEFAULT true,
+                                        PRIMARY KEY (timestamp, site_id, meter_id)
+                                    )
+                                    """)
+                                    
+                                    print("Vanna client re-instantiated successfully.", flush=True)
+                                except Exception as e:
+                                    print(f"Warning: Failed to re-instantiate Vanna client: {e}", flush=True)
+                        
+                        elif manifest.get('includes_chromadb') and 'chroma.sqlite3' in zf.namelist():
+                            # Legacy single file restore
+                            print("Starting ChromaDB/Vanna vector store restoration (legacy)...", flush=True)
                             chroma_content = zf.read('chroma.sqlite3')
-                            with open('chroma.sqlite3', 'wb') as f:
+                            os.makedirs('/app/chroma_data', exist_ok=True)
+                            with open('/app/chroma_data/chroma.sqlite3', 'wb') as f:
                                 f.write(chroma_content)
                         
             finally:
