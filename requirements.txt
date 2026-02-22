@@ -9,3 +9,5 @@ plotly==5.20.0
 sqlalchemy==2.0.25
 holidays==0.41
 python-multipart
+chromadb
+httpx==0.27.2
