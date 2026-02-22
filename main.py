@@ -1079,7 +1079,9 @@ async def restore_database(file: UploadFile = File(...)):
                         csv_content = zf.read(name).decode('utf-8')
                         df = pd.read_csv(io.StringIO(csv_content))
                         
-                        columns = ', '.join([f"{col} TYPE" for col in df.columns])
+                        # Normalize columns (lowercase, strip whitespace)
+                        df.columns = df.columns.str.lower().str.strip()
+                        
                         cursor.execute(f"SELECT 1 FROM information_schema.tables WHERE table_name = %s", [table_name])
                         if not cursor.fetchone():
                             raise HTTPException(
@@ -1087,6 +1089,57 @@ async def restore_database(file: UploadFile = File(...)):
                                 detail=f"Table '{table_name}' does not exist in the database. Schema drift detected."
                             )
                         
+                        if table_name == 'energy_readings':
+                            # Apply robust handling similar to CSV upload
+                            
+                            # 1. Aliases
+                            column_mapping = {
+                                'time': 'timestamp',
+                                'site': 'site_id',
+                                'meter': 'meter_id',
+                                'production_energy': 'export_energy',
+                                'production_power': 'export_power',
+                                'consumption_energy': 'import_energy',
+                                'consumption_power': 'import_power',
+                            }
+                            df = df.rename(columns=column_mapping)
+                            
+                            # 2. Ensure timestamp column exists
+                            if 'timestamp' in df.columns:
+                                # Parse timestamps
+                                df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+                                
+                                # 3. Calculate derived columns if missing
+                                if 'day_of_week' not in df.columns or 'workday' not in df.columns:
+                                    try:
+                                        import holidays
+                                        # Use Austrian holidays as default, matching upload logic
+                                        at_holidays = holidays.Austria(years=range(2020, 2030), subdiv=3)
+                                        
+                                        # Convert timezone
+                                        if df['timestamp'].dt.tz is None:
+                                            df['timestamp'] = df['timestamp'].dt.tz_localize('UTC')
+                                        df['timestamp'] = df['timestamp'].dt.tz_convert('Europe/Vienna')
+                                        
+                                        if 'day_of_week' not in df.columns:
+                                            df['day_of_week'] = df['timestamp'].dt.day_name()
+                                            
+                                        if 'workday' not in df.columns:
+                                            df['date_only'] = df['timestamp'].dt.date
+                                            df['workday'] = df.apply(
+                                                lambda r: r['date_only'] not in at_holidays and r['day_of_week'] not in ['Saturday', 'Sunday'],
+                                                axis=1
+                                            )
+                                            df = df.drop(columns=['date_only'])
+                                    except Exception as e:
+                                        print(f"Warning: Failed to calculate derived columns: {e}")
+                            
+                            # 4. Ensure numeric columns are numeric
+                            numeric_cols = ['export_energy', 'export_power', 'import_energy', 'import_power']
+                            for col in numeric_cols:
+                                if col in df.columns:
+                                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
                         for _, row in df.iterrows():
                             cols = ', '.join(df.columns)
                             placeholders = ', '.join(['%s'] * len(df.columns))

@@ -7,6 +7,7 @@ function ManagePage() {
   const [loading, setLoading] = useState(true);
   
   const [file, setFile] = useState(null);
+  const [restoreFile, setRestoreFile] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -68,14 +69,15 @@ function ManagePage() {
         setError('Please select a .zip file');
         return;
       }
+      setRestoreFile(selectedFile);
     } else {
       if (selectedFile && !selectedFile.name.endsWith('.csv')) {
         setError('Please select a CSV file');
         return;
       }
+      setFile(selectedFile);
     }
     
-    setFile(selectedFile);
     setError(null);
     setMessage(null);
   };
@@ -104,7 +106,8 @@ function ManagePage() {
       if (response.ok) {
         setMessage(data.message);
         setFile(null);
-        document.querySelector('input[type="file"]').value = '';
+        const fileInput = document.getElementById('file-input');
+        if (fileInput) fileInput.value = '';
         fetchData();
       } else {
         setError(data.error || data.detail || 'Upload failed');
@@ -172,12 +175,12 @@ function ManagePage() {
   };
 
   const handleRestore = async () => {
-    if (!file) {
+    if (!restoreFile) {
       setError('Please select a backup file first');
       return;
     }
 
-    if (!file.name.endsWith('.zip')) {
+    if (!restoreFile.name.endsWith('.zip')) {
       setError('Please select a .zip backup file');
       return;
     }
@@ -189,7 +192,7 @@ function ManagePage() {
     setMessage(null);
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', restoreFile);
 
     try {
       const response = await fetch('/api/restore', {
@@ -201,8 +204,9 @@ function ManagePage() {
 
       if (response.ok) {
         setMessage(data.message || 'Restore completed successfully');
-        setFile(null);
-        document.querySelector('input[type="file"]').value = '';
+        setRestoreFile(null);
+        const restoreInput = document.getElementById('restore-file-input');
+        if (restoreInput) restoreInput.value = '';
         fetchData();
       } else {
         setError(data.detail || data.message || 'Restore failed');
@@ -452,8 +456,8 @@ function ManagePage() {
               />
               <label htmlFor="restore-file-input" className="file-label">
                 <div className="drop-message">
-                  {file ? (
-                    <span className="file-name">{file.name}</span>
+                  {restoreFile ? (
+                    <span className="file-name">{restoreFile.name}</span>
                   ) : (
                     <span>Select backup file</span>
                   )}
@@ -463,7 +467,7 @@ function ManagePage() {
             
             <button 
               onClick={handleRestore} 
-              disabled={!file || restoreLoading}
+              disabled={!restoreFile || restoreLoading}
               className="restore-button"
             >
               {restoreLoading ? 'Restoring...' : 'Restore Backup'}
