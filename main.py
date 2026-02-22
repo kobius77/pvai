@@ -1093,6 +1093,29 @@ async def restore_database(file: UploadFile = File(...)):
                             values = [None if pd.isna(v) else v for v in row.values]
                             
                             if table_name == 'energy_readings':
+                                col_mapping = {
+                                    'timestamp': None, 'site_id': None, 'meter_id': None,
+                                    'export_energy': None, 'export_power': None,
+                                    'import_energy': None, 'import_power': None,
+                                    'day_of_week': None, 'workday': None
+                                }
+                                for col in df.columns:
+                                    if col in col_mapping:
+                                        col_mapping[col] = row[col]
+                                
+                                values = [
+                                    col_mapping.get('timestamp'),
+                                    col_mapping.get('site_id'),
+                                    col_mapping.get('meter_id'),
+                                    col_mapping.get('export_energy'),
+                                    col_mapping.get('export_power'),
+                                    col_mapping.get('import_energy'),
+                                    col_mapping.get('import_power'),
+                                    col_mapping.get('day_of_week'),
+                                    col_mapping.get('workday'),
+                                ]
+                                values = [None if pd.isna(v) else v for v in values]
+                                
                                 upsert = """
                                     INSERT INTO energy_readings (timestamp, site_id, meter_id, export_energy, export_power, import_energy, import_power, day_of_week, workday)
                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
