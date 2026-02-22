@@ -1048,6 +1048,8 @@ async def backup_database():
 async def restore_database(file: UploadFile = File(...)):
     import zipfile
     
+    print(f"Started extraction of {file.filename}", flush=True)
+    
     if not file.filename.endswith('.zip'):
         raise HTTPException(status_code=400, detail="Only .zip files are accepted")
     
@@ -1076,8 +1078,11 @@ async def restore_database(file: UploadFile = File(...)):
                 for name in zf.namelist():
                     if name.endswith('.csv'):
                         table_name = name[:-4]
+                        print(f"Database restore started: processing {table_name}...", flush=True)
+                        
                         csv_content = zf.read(name).decode('utf-8')
                         df = pd.read_csv(io.StringIO(csv_content))
+                        row_count = len(df)
                         
                         # Normalize columns (lowercase, strip whitespace)
                         df.columns = df.columns.str.lower().str.strip()
@@ -1132,7 +1137,7 @@ async def restore_database(file: UploadFile = File(...)):
                                             )
                                             df = df.drop(columns=['date_only'])
                                     except Exception as e:
-                                        print(f"Warning: Failed to calculate derived columns: {e}")
+                                        print(f"Warning: Failed to calculate derived columns: {e}", flush=True)
                             
                             # 4. Ensure numeric columns are numeric
                             numeric_cols = ['export_energy', 'export_power', 'import_energy', 'import_power']
@@ -1140,6 +1145,7 @@ async def restore_database(file: UploadFile = File(...)):
                                 if col in df.columns:
                                     df[col] = pd.to_numeric(df[col], errors='coerce')
 
+                        inserted_count = 0
                         for _, row in df.iterrows():
                             cols = ', '.join(df.columns)
                             placeholders = ', '.join(['%s'] * len(df.columns))
@@ -1181,6 +1187,7 @@ async def restore_database(file: UploadFile = File(...)):
                                         workday = EXCLUDED.workday
                                 """
                                 cursor.execute(upsert, values)
+                                inserted_count += 1
                             else:
                                 pk_cursor = conn.cursor()
                                 pk_cursor.execute(f"""
@@ -1203,22 +1210,29 @@ async def restore_database(file: UploadFile = File(...)):
                                             ON CONFLICT ({', '.join(pk_cols)}) DO UPDATE SET {set_clause}
                                         """
                                         cursor.execute(upsert, values)
+                                        inserted_count += 1
                                     else:
                                         insert = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders})"
                                         cursor.execute(insert, values)
+                                        inserted_count += 1
                                 else:
                                     insert = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders})"
                                     cursor.execute(insert, values)
+                                    inserted_count += 1
                         
                         conn.commit()
+                        print(f"Successfully inserted {inserted_count} rows into {table_name}", flush=True)
                         
                         if manifest.get('includes_chromadb') and 'chroma.sqlite3' in zf.namelist():
+                            print("Starting ChromaDB/Vanna vector store restoration...", flush=True)
                             chroma_content = zf.read('chroma.sqlite3')
                             with open('chroma.sqlite3', 'wb') as f:
                                 f.write(chroma_content)
                         
             finally:
                 get_db_pool().putconn(conn)
+        
+        print("Restore complete.", flush=True)
     
     except HTTPException:
         raise
