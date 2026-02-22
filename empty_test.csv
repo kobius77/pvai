@@ -1,0 +1,3 @@
+timestamp,export_energy,export_power,import_energy,import_power
+2024-01-06 00:00:00,,5.2,45.2,
+2024-01-06 00:15:00,10.5,,,
