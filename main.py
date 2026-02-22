@@ -3,6 +3,7 @@ import io
 import json
 import re
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -355,13 +356,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="src/client/build/static"), name="static")
+BUILD_DIR = Path("src/client/build")
+
+if BUILD_DIR.exists():
+    app.mount("/static", StaticFiles(directory="src/client/build/static"), name="static")
 
 
-@app.get("/")
-async def root():
-    with open("src/client/build/index.html") as f:
-        return HTMLResponse(f.read())
+    @app.get("/")
+    async def root():
+        with open("src/client/build/index.html") as f:
+            return HTMLResponse(f.read())
 
 
 @app.get("/api/health")
