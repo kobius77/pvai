@@ -1,16 +1,54 @@
 services:
-  timescaledb:
-    image: timescale/timescaledb:latest-pg15
-    container_name: timescaledb_dev
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: pv_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-pvuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pvpassword}
+      POSTGRES_DB: ${DB_NAME:-pvdatabase}
     ports:
-      - "${DB_PORT}:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - timescaledb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-pvuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: pv_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-pvuser}
+      - DB_PASSWORD=${DB_PASSWORD:-pvpassword}
+      - DB_NAME=${DB_NAME:-pvdatabase}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - chroma-data:/app/chroma_data
+
+  frontend:
+    build:
+      context: ./src/client
+      dockerfile: ../Dockerfile.frontend
+    container_name: pv_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   timescaledb-data:
+  chroma-data:

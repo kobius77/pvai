@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Database
+*.sqlite3
+chroma.sqlite3
+chromadb/
+*-[a-f0-9-]*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs (for local dev)
+src/client/build/
+
+# Logs
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Test/coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Misc
+*.md
+!requirements.txt
