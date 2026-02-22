@@ -191,6 +191,9 @@ function ManagePage() {
     setError(null);
     setMessage(null);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minutes
+
     const formData = new FormData();
     formData.append('file', restoreFile);
 
@@ -198,6 +201,7 @@ function ManagePage() {
       const response = await fetch('/api/restore', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
 
       const data = await response.json();
@@ -213,8 +217,13 @@ function ManagePage() {
       }
     } catch (err) {
       console.error('Restore failed:', err);
-      setError('Failed to restore backup');
+      if (err.name === 'AbortError') {
+        setError('Restore timed out after 5 minutes');
+      } else {
+        setError('Failed to restore backup');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setRestoreLoading(false);
     }
   };
@@ -470,7 +479,7 @@ function ManagePage() {
               disabled={!restoreFile || restoreLoading}
               className="restore-button"
             >
-              {restoreLoading ? 'Restoring...' : 'Restore Backup'}
+              {restoreLoading ? 'Restoring... this may take a few minutes. Do not refresh.' : 'Restore Backup'}
             </button>
 
             {message && <div className="success-message">{message}</div>}

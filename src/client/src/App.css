@@ -210,6 +210,37 @@ select:focus, input:focus {
   cursor: not-allowed;
 }
 
+/* Example Questions */
+.example-questions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+.example-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.example-question {
+  color: #004973;
+  font-size: 0.9rem;
+  cursor: pointer;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.example-question:hover {
+  text-decoration: underline;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .debug-toggle {
   position: absolute;
   left: 16px;

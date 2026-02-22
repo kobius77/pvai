@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Plot from 'react-plotly.js';
 
@@ -11,6 +11,34 @@ function Dashboard() {
   const [briefMode, setBriefMode] = useState(false);
   const [expandedSql, setExpandedSql] = useState({});
   const [expandedResult, setExpandedResult] = useState({});
+
+  const exampleQuestions = [
+    'Wie viel Strom haben wir pro Arbeitstag im Durchschnitt von Mai bis Oktober 2024 zwischen 17 und 7 Uhr importiert?',
+    'Was war die maximale Leistung die wir exportiert haben?',
+    'Zeige den Stromexport pro Monat im Verlauf.'
+  ];
+  const [currentExample, setCurrentExample] = useState(0);
+  const [fadeKey, setFadeKey] = useState(0);
+
+  useEffect(() => {
+    if (chatHistory.length === 0) {
+      const interval = setInterval(() => {
+        setFadeKey(prev => prev + 1);
+        setCurrentExample(prev => (prev + 1) % exampleQuestions.length);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [chatHistory.length]);
+
+  const handleExampleClick = (question) => {
+    setChatInput(question);
+    // Trigger form submission
+    const form = document.querySelector('.chat-form');
+    if (form) {
+      const event = new Event('submit', { bubbles: true, cancelable: true });
+      form.dispatchEvent(event);
+    }
+  };
 
   const handleChat = async (e) => {
     e.preventDefault();
@@ -142,6 +170,19 @@ function Dashboard() {
               )}
             </button>
           </form>
+
+          {chatHistory.length === 0 && (
+            <div className="example-questions">
+              <span className="example-label">Example: </span>
+              <span 
+                key={fadeKey} 
+                className="example-question"
+                onClick={() => handleExampleClick(exampleQuestions[currentExample])}
+              >
+                {exampleQuestions[currentExample]}
+              </span>
+            </div>
+          )}
 
           <div className="chat-history">
             {chatHistory.map((item, idx) => {
