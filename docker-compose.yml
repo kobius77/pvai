@@ -34,7 +34,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - chroma-data:/app/chroma_data
+      - ./chroma-data:/app/chroma_data
 
   frontend:
     build:
@@ -49,4 +49,3 @@ services:
 
 volumes:
   timescaledb-data:
-  chroma-data:
