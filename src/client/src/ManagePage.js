@@ -61,10 +61,20 @@ function ManagePage() {
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
-    if (selectedFile && !selectedFile.name.endsWith('.csv')) {
-      setError('Please select a CSV file');
-      return;
+    const inputId = e.target.id;
+    
+    if (inputId === 'restore-file-input') {
+      if (selectedFile && !selectedFile.name.endsWith('.zip')) {
+        setError('Please select a .zip file');
+        return;
+      }
+    } else {
+      if (selectedFile && !selectedFile.name.endsWith('.csv')) {
+        setError('Please select a CSV file');
+        return;
+      }
     }
+    
     setFile(selectedFile);
     setError(null);
     setMessage(null);
