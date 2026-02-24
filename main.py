@@ -425,7 +425,8 @@ async def get_data(year: str = "2024", month: str = "", day: str = ""):
             cursor.execute("""
                 SELECT date_trunc('day', timestamp) as day,
                        SUM(import_energy) as import_energy,
-                       SUM(export_energy) as export_energy
+                       SUM(export_energy) as export_energy,
+                       bool_and(workday) as is_workday
                 FROM energy_readings
                 WHERE timestamp >= %s AND timestamp < %s
                 GROUP BY date_trunc('day', timestamp)
@@ -447,11 +448,15 @@ async def get_data(year: str = "2024", month: str = "", day: str = ""):
         print(f"DEBUG data: year={year}, month={month}, day={day}, rows={len(rows)}")
         result = []
         for row in rows:
-            result.append({
+            item = {
                 "timestamp": row[0].isoformat() if row[0] else None,
                 "import_energy": float(row[1]) if row[1] else None,
                 "export_energy": float(row[2]) if row[2] else None,
-            })
+            }
+            # Include is_workday for monthly view
+            if month:
+                item["is_workday"] = bool(row[3]) if row[3] is not None else True
+            result.append(item)
         return result
     finally:
         get_db_pool().putconn(conn)

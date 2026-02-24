@@ -7,9 +7,64 @@ function ChartPage() {
   const [chartData, setChartData] = useState([]);
   const [displayData, setDisplayData] = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
-  const [year, setYear] = useState('2024');
-  const [month, setMonth] = useState('');
-  const [day, setDay] = useState('');
+  
+  const getParamsFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      year: params.get('year') || '2024',
+      month: params.get('month') || '',
+      day: params.get('day') || ''
+    };
+  };
+  
+  const [year, setYear] = useState(getParamsFromUrl().year);
+  const [month, setMonth] = useState(getParamsFromUrl().month);
+  const [day, setDay] = useState(getParamsFromUrl().day);
+
+  const updateUrl = (newYear, newMonth, newDay) => {
+    const params = new URLSearchParams();
+    params.set('year', newYear);
+    if (newMonth) params.set('month', newMonth);
+    if (newDay) params.set('day', newDay);
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({ year: newYear, month: newMonth, day: newDay }, '', newUrl);
+  };
+
+  const handleSetYear = (newYear) => {
+    setYear(newYear);
+    setMonth('');
+    setDay('');
+    updateUrl(newYear, '', '');
+  };
+
+  const handleSetMonth = (newMonth) => {
+    setMonth(newMonth);
+    setDay('');
+    updateUrl(year, newMonth, '');
+  };
+
+  const handleSetDay = (newDay) => {
+    setDay(newDay);
+    updateUrl(year, month, newDay);
+  };
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (event.state) {
+        setYear(event.state.year || '2024');
+        setMonth(event.state.month || '');
+        setDay(event.state.day || '');
+      } else {
+        const params = getParamsFromUrl();
+        setYear(params.year);
+        setMonth(params.month);
+        setDay(params.day);
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -29,6 +84,7 @@ function ChartPage() {
           ...row,
           timestamp: format(date, day ? 'HH:mm' : (month ? 'MMM dd' : 'MMM')),
           displayLabel: day ? format(new Date(date.getTime() + date.getTimezoneOffset() * 60000), 'HH:mm') : (month ? format(date, 'MMM dd') : format(date, 'MMM yyyy')),
+          weekday: month && !day ? format(date, 'EEE') : null,
           import_energy: row.import_energy != null ? parseFloat(Number(row.import_energy).toFixed(2)) : null,
           export_energy: row.export_energy != null ? parseFloat(Number(row.export_energy).toFixed(2)) : null,
         };
@@ -71,18 +127,14 @@ function ChartPage() {
         <div className="chart-card">
           <h2>Energy Overview</h2>
           <div className="chart-controls">
-            <div className="chart-nav-left">
-              {(month || day) && (
-                <button onClick={() => { setMonth(''); setDay(''); }} className="nav-button">← Back</button>
-              )}
-            </div>
+            <div className="chart-nav-left"></div>
             <div className="chart-nav-center">
               {day && (
                 <button onClick={() => {
                   const d = parseInt(day);
                   const m = parseInt(month);
-                  if (d > 1) setDay((d - 1).toString());
-                  else if (m > 1) { setMonth((m - 1).toString()); setDay(new Date(parseInt(year), m - 1, 0).getDate().toString()); }
+                  if (d > 1) handleSetDay((d - 1).toString());
+                  else if (m > 1) { handleSetMonth((m - 1).toString()); handleSetDay(new Date(parseInt(year), m - 1, 0).getDate().toString()); }
                 }} className="nav-button">← Prev</button>
               )}
               {day && (
@@ -90,20 +142,20 @@ function ChartPage() {
                   const d = parseInt(day);
                   const m = parseInt(month);
                   const daysInMonth = new Date(parseInt(year), m, 0).getDate();
-                  if (d < daysInMonth) setDay((d + 1).toString());
-                  else if (m < 12) { setMonth((m + 1).toString()); setDay('1'); }
+                  if (d < daysInMonth) handleSetDay((d + 1).toString());
+                  else if (m < 12) { handleSetMonth((m + 1).toString()); handleSetDay('1'); }
                 }} className="nav-button">Next →</button>
               )}
               {month && !day && (
                 <button onClick={() => {
                   const m = parseInt(month);
-                  if (m > 1) setMonth((m - 1).toString());
+                  if (m > 1) handleSetMonth((m - 1).toString());
                 }} className="nav-button">← Prev</button>
               )}
               {month && !day && (
                 <button onClick={() => {
                   const m = parseInt(month);
-                  if (m < 12) setMonth((m + 1).toString());
+                  if (m < 12) handleSetMonth((m + 1).toString());
                 }} className="nav-button">Next →</button>
               )}
             </div>
@@ -111,7 +163,7 @@ function ChartPage() {
               {month && (
                 <select 
                   value={day} 
-                  onChange={(e) => setDay(e.target.value)}
+                  onChange={(e) => handleSetDay(e.target.value)}
                   className="interval-select"
                 >
                   <option value="">Full Month</option>
@@ -122,7 +174,7 @@ function ChartPage() {
               )}
               <select 
                 value={month} 
-                onChange={(e) => { setMonth(e.target.value); setDay(''); }}
+                onChange={(e) => handleSetMonth(e.target.value)}
                 className="interval-select"
               >
                 <option value="">Full Year</option>
@@ -141,7 +193,7 @@ function ChartPage() {
               </select>
               <select 
                 value={year} 
-                onChange={(e) => { setYear(e.target.value); setMonth(''); setDay(''); }}
+                onChange={(e) => handleSetYear(e.target.value)}
                 className="interval-select"
               >
                 <option value="2023">2023</option>
@@ -165,8 +217,12 @@ function ChartPage() {
                   borderColor: 'transparent',
                   textStyle: { color: '#fff', fontSize: 12 },
                   formatter: (params) => {
+                    const dataIndex = params[0]?.dataIndex;
+                    const dataItem = displayData[dataIndex];
                     const label = params[0]?.name || '';
-                    let html = `<div style="border-bottom:1px solid rgba(255,255,255,0.5);padding-bottom:4px;margin-bottom:4px">${label}</div>`;
+                    const weekday = dataItem?.weekday;
+                    const displayLabel = weekday ? `${weekday} ${label}` : label;
+                    let html = `<div style="border-bottom:1px solid rgba(255,255,255,0.5);padding-bottom:4px;margin-bottom:4px">${displayLabel}</div>`;
                     params.forEach(p => {
                       html += `<div style="color:#fff">${p.value?.toFixed(2) || 'N/A'} ${p.seriesName}</div>`;
                     });
@@ -178,7 +234,8 @@ function ChartPage() {
                   data: ['Import', 'Export'],
                   bottom: 0,
                   itemGap: 20,
-                  icon: 'rect'
+                  icon: 'rect',
+                  selected: { 'Non-workday': false }
                 },
                 xAxis: {
                   type: 'category',
@@ -196,16 +253,20 @@ function ChartPage() {
                   {
                     name: 'Import',
                     type: 'bar',
+                    stack: 'energy',
+                    barWidth: '65%',
+                    z: 2,
                     data: displayData.map(d => d.import_energy),
-                    itemStyle: { color: '#7eb5d6' },
-                    barGap: '2%'
+                    itemStyle: { color: '#7eb5d6' }
                   },
                   {
                     name: 'Export',
                     type: 'bar',
-                    data: displayData.map(d => d.export_energy),
-                    itemStyle: { color: '#004973' },
-                    barGap: '2%'
+                    stack: 'energy',
+                    barWidth: '65%',
+                    z: 2,
+                    data: displayData.map(d => d.export_energy ? -d.export_energy : null),
+                    itemStyle: { color: '#004973' }
                   }
                 ]
               }}
@@ -214,11 +275,11 @@ function ChartPage() {
                   if (!day && month) {
                     const label = params.name;
                     const dayNum = label.match(/(\d+)/)?.[1];
-                    if (dayNum) setDay(dayNum);
+                    if (dayNum) handleSetDay(dayNum);
                   } else if (!month) {
                     const label = params.name;
                     const monthNum = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(label.substring(0,3)) + 1;
-                    if (monthNum) setMonth(monthNum.toString());
+                    if (monthNum) handleSetMonth(monthNum.toString());
                   }
                 }
               }}

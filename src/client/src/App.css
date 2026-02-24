@@ -863,6 +863,25 @@ select:focus, input:focus {
   background: #003f6b;
 }
 
+@media (max-width: 768px) {
+  .chart-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .chart-nav-left,
+  .chart-nav-center,
+  .chart-nav-right {
+    min-width: auto;
+    justify-content: center;
+  }
+
+  .chart-nav-right {
+    justify-content: center;
+  }
+}
+
 /* Meter row */
 .meter-row {
   display: flex;

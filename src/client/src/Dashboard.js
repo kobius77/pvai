@@ -15,7 +15,7 @@ function Dashboard() {
   const exampleQuestions = [
     'Wie viel Strom haben wir pro Arbeitstag im Durchschnitt von Mai bis Oktober 2024 zwischen 17 und 7 Uhr importiert?',
     'Was war die maximale Leistung die wir exportiert haben?',
-    'Zeige den Stromexport pro Monat im Verlauf.'
+    'Wie viel Strom haben wir 2024 je Monat exportiert? Zeige mir das als Balkendiagramm.'
   ];
   const [currentExample, setCurrentExample] = useState(0);
   const [fadeKey, setFadeKey] = useState(0);
