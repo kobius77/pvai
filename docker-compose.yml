@@ -29,7 +29,8 @@ services:
       - DB_USER=${DB_USER:-pvuser}
       - DB_PASSWORD=${DB_PASSWORD:-pvpassword}
       - DB_NAME=${DB_NAME:-pvdatabase}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
     depends_on:
       db:
         condition: service_healthy
